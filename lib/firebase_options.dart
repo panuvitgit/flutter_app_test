@@ -46,8 +46,7 @@ class DefaultFirebaseOptions {
     messagingSenderId: '911584380054',
     projectId: 'realtime-database-esp32-833b9',
     authDomain: 'realtime-database-esp32-833b9.firebaseapp.com',
-    databaseURL:
-        'https://realtime-database-esp32-833b9-default-rtdb.asia-southeast1.firebasedatabase.app',
+    databaseURL: 'https://realtime-database-esp32-833b9-default-rtdb.asia-southeast1.firebasedatabase.app',
     storageBucket: 'realtime-database-esp32-833b9.firebasestorage.app',
     measurementId: 'G-44DM2Q25HJ',
   );
@@ -57,8 +56,7 @@ class DefaultFirebaseOptions {
     appId: '1:911584380054:android:57f5ad163ce5e95130eeb7',
     messagingSenderId: '911584380054',
     projectId: 'realtime-database-esp32-833b9',
-    databaseURL:
-        'https://realtime-database-esp32-833b9-default-rtdb.asia-southeast1.firebasedatabase.app',
+    databaseURL: 'https://realtime-database-esp32-833b9-default-rtdb.asia-southeast1.firebasedatabase.app',
     storageBucket: 'realtime-database-esp32-833b9.firebasestorage.app',
   );
 
@@ -67,9 +65,9 @@ class DefaultFirebaseOptions {
     appId: '1:911584380054:ios:f288d36b63774dda30eeb7',
     messagingSenderId: '911584380054',
     projectId: 'realtime-database-esp32-833b9',
-    databaseURL:
-        'https://realtime-database-esp32-833b9-default-rtdb.asia-southeast1.firebasedatabase.app',
+    databaseURL: 'https://realtime-database-esp32-833b9-default-rtdb.asia-southeast1.firebasedatabase.app',
     storageBucket: 'realtime-database-esp32-833b9.firebasestorage.app',
+    iosClientId: '911584380054-9471u647mvb3h5mdal11u387sf16c5s8.apps.googleusercontent.com',
     iosBundleId: 'com.example.flutterAppTest',
   );
 
@@ -78,9 +76,9 @@ class DefaultFirebaseOptions {
     appId: '1:911584380054:ios:f288d36b63774dda30eeb7',
     messagingSenderId: '911584380054',
     projectId: 'realtime-database-esp32-833b9',
-    databaseURL:
-        'https://realtime-database-esp32-833b9-default-rtdb.asia-southeast1.firebasedatabase.app',
+    databaseURL: 'https://realtime-database-esp32-833b9-default-rtdb.asia-southeast1.firebasedatabase.app',
     storageBucket: 'realtime-database-esp32-833b9.firebasestorage.app',
+    iosClientId: '911584380054-9471u647mvb3h5mdal11u387sf16c5s8.apps.googleusercontent.com',
     iosBundleId: 'com.example.flutterAppTest',
   );
 
@@ -90,9 +88,9 @@ class DefaultFirebaseOptions {
     messagingSenderId: '911584380054',
     projectId: 'realtime-database-esp32-833b9',
     authDomain: 'realtime-database-esp32-833b9.firebaseapp.com',
-    databaseURL:
-        'https://realtime-database-esp32-833b9-default-rtdb.asia-southeast1.firebasedatabase.app',
+    databaseURL: 'https://realtime-database-esp32-833b9-default-rtdb.asia-southeast1.firebasedatabase.app',
     storageBucket: 'realtime-database-esp32-833b9.firebasestorage.app',
     measurementId: 'G-DZ7SJHBG7T',
   );
+
 }

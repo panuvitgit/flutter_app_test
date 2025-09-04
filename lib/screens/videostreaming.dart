@@ -1,52 +1,39 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_mjpeg/flutter_mjpeg.dart'; // ✅ สำคัญ
 
 class VideoStreamingPage extends StatelessWidget {
   const VideoStreamingPage({super.key});
 
-  final String streamUrl =
-      'http://10.110.38.217:81/stream'; // เปลี่ยนตาม IP จริง
-
   @override
   Widget build(BuildContext context) {
-    final List<String> recordedVideos = ['Record 1', 'Record 2', 'Record 3'];
+    // ลิสต์ชื่อวิดีโอ mockup
+    final List<String> recordedVideos = [
+      'Record 1',
+      'Record 2',
+      'Record 3',
+    ];
 
     return Scaffold(
       appBar: AppBar(
         title: const Text('Video Monitoring'),
-        backgroundColor: Colors.deepPurple,
-        foregroundColor: Colors.white,
+        backgroundColor: const Color.fromRGBO(86, 3, 229, 1),
       ),
       body: Column(
         children: [
-          // LIVE VIEW AREA
+          // LIVE VIEW AREA (mock)
           Expanded(
             flex: 2,
             child: Container(
               width: double.infinity,
               color: Colors.black,
-              child: Mjpeg(
-                stream: streamUrl,
-                isLive: true,
-                fit: BoxFit.cover,
-                error: (context, error, stackTrace) {
-                  return const Center(
-                    child: Text(
-                      'ไม่สามารถโหลดภาพจากกล้องได้',
-                      style: TextStyle(color: Colors.white),
-                    ),
-                  );
-                },
-                loading: (context) {
-                  return const Center(
-                    child: CircularProgressIndicator(color: Colors.white),
-                  );
-                },
+              alignment: Alignment.center,
+              child: const Text(
+                'LIVE STREAM HERE',
+                style: TextStyle(color: Colors.white, fontSize: 18),
               ),
             ),
           ),
 
-          const Divider(height: 1),
+          const Divider(),
 
           // RECORDED VIDEO LIST
           Expanded(
@@ -59,11 +46,7 @@ class VideoStreamingPage extends StatelessWidget {
                   title: Text(recordedVideos[index]),
                   trailing: const Icon(Icons.play_arrow),
                   onTap: () {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(
-                        content: Text('ยังไม่ได้เชื่อมต่อวิดีโอย้อนหลัง'),
-                      ),
-                    );
+                    // ยังไม่ทำอะไรตอนนี้ (mockup เฉย ๆ)
                   },
                 );
               },

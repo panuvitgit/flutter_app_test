@@ -39,10 +39,7 @@ class Home extends StatelessWidget {
             ),
             ListTile(
               leading: const Icon(Icons.person, color: Colors.black),
-              title: const Text(
-                "My Profile",
-                style: TextStyle(color: Colors.black),
-              ),
+              title: const Text("My Profile", style: TextStyle(color: Colors.black)),
               onTap: () {
                 Navigator.push(
                   context,
@@ -78,35 +75,33 @@ class Home extends StatelessWidget {
               context,
               icon: Icons.toggle_on_outlined,
               label: "Switch Button",
-              onPressed:
-                  () => Navigator.push(
-                    context,
-                    MaterialPageRoute(builder: (_) => const Switchbutton()),
-                  ),
+              onPressed: () => Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => const Switchbutton()),
+              ),
             ),
             const SizedBox(height: 47),
             buildModernCard(
               context,
               icon: Icons.bar_chart_outlined,
               label: "Dashboard",
-              onPressed:
-                  () => Navigator.push(
-                    context,
-                    MaterialPageRoute(builder: (_) => const DashboardPage()),
-                  ),
+              onPressed: () => Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => const DashboardPage()),
+              ),
             ),
-            const SizedBox(height: 47),
+            const SizedBox(height: 25),
+            // เปลี่ยนจาก ElevatedButton เป็นการ์ดแบบเดียวกัน
             buildModernCard(
               context,
-              icon: Icons.videocam_outlined,
+              icon: Icons.video_collection_outlined,
               label: "Video Streaming",
-              onPressed:
-                  () => Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (_) => const VideoStreamingPage(),
-                    ),
-                  ),
+              onPressed: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => const VideoStreamingPage()),
+                );
+              },
             ),
           ],
         ),

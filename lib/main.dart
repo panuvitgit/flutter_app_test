@@ -10,6 +10,10 @@ import 'package:flutter_app_test/screens/switchbutton.dart';
 import 'package:flutter_app_test/screens/chart_day.dart';
 import 'package:flutter_app_test/screens/chart_week.dart';
 import 'package:flutter_app_test/screens/chart_month.dart';
+import 'package:flutter_app_test/screens/chart_year.dart';
+import 'package:flutter_app_test/screens/snapshot_page.dart';
+
+
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
@@ -41,6 +45,9 @@ class MyApp extends StatelessWidget {
         '/chart_day': (context) => const ChartDay(),
         '/chart_week': (context) => const ChartWeek(),
         '/chart_month': (context) => const ChartMonth(),
+        '/chart_year': (context) => const ChartYear(),
+        '/snapshot': (context) => const SnapshotPage()
+
       },
       onUnknownRoute: (settings) => MaterialPageRoute(
         builder: (_) => const Scaffold(

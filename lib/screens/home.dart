@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_app_test/screens/myprofile.dart';
 import 'package:flutter_app_test/screens/switchbutton.dart';
-import 'package:flutter_app_test/screens/videostreaming.dart';
+import 'package:flutter_app_test/screens/snapshot_page.dart';
 import 'package:flutter_app_test/screens/dashboard.dart';
 
 class Home extends StatelessWidget {
@@ -95,11 +95,11 @@ class Home extends StatelessWidget {
             buildModernCard(
               context,
               icon: Icons.video_collection_outlined,
-              label: "Video Streaming",
+              label: "Snapshot",
               onPressed: () {
                 Navigator.push(
                   context,
-                  MaterialPageRoute(builder: (_) => const VideoStreamingPage()),
+                  MaterialPageRoute(builder: (_) => const SnapshotPage()),
                 );
               },
             ),

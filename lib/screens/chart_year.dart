@@ -4,44 +4,49 @@ import 'package:fl_chart/fl_chart.dart';
 import 'package:intl/intl.dart';
 import 'dart:math' as math;
 
-class ChartMonth extends StatefulWidget {
-  const ChartMonth({super.key});
+const Color kLineColor = Color(0xFF43A5F5);
+
+// ถ้า field `energy` ในฐานข้อมูลเป็น Wh ให้ตั้ง = 0.001 (ค่าเริ่มต้น = kWh)
+const double kEnergyUnitFactor = 1.0;
+
+class ChartYear extends StatefulWidget {
+  const ChartYear({super.key});
 
   @override
-  State<ChartMonth> createState() => _ChartMonthState();
+  State<ChartYear> createState() => _ChartYearState();
 }
 
-class _ChartMonthState extends State<ChartMonth> {
-  static const Color kLineColor = Color(0xFF43A5F5);
-
+class _ChartYearState extends State<ChartYear> {
   @override
   Widget build(BuildContext context) {
     final DatabaseReference ref = FirebaseDatabase.instance.ref('/device1/history');
 
-    // ช่วงเดือนปัจจุบัน (Local)
     final now = DateTime.now();
-    final DateTime startOfMonthLocal = DateTime(now.year, now.month, 1);
-    final DateTime endOfMonthLocal   = DateTime(now.year, now.month + 1, 1);
-    final int daysInMonth = endOfMonthLocal.difference(startOfMonthLocal).inDays;
+    final int year = now.year;
 
-    // query ด้วย epoch(UTC) — ให้มี baseline s-1 เหมือนหน้า Day
-    final int startTsUtc = (startOfMonthLocal.toUtc().millisecondsSinceEpoch / 1000).floor();
-    final int endTsUtc   = (endOfMonthLocal.toUtc().millisecondsSinceEpoch   / 1000).floor();
+    // ช่วงแสดงผล: 12 เดือนเต็มของปีนี้
+    final DateTime displayStart = DateTime(year, 1, 1);
+    final DateTime displayEnd   = DateTime(year + 1, 1, 1); // exclusive
 
-    final String title = 'Monthly Report • ${DateFormat('yyyy-MM').format(startOfMonthLocal)}';
+    // ช่วงคำนวณจริง: ถึงต้นเดือนถัดไปของเดือนปัจจุบัน (ไม่รวมอนาคต)
+    final DateTime statsEnd = DateTime(now.year, now.month + 1, 1);
+    final DateTime queryEnd = statsEnd.isBefore(displayEnd) ? statsEnd : displayEnd;
+
+    // ใช้สตาร์ตที่ (Jan 1 - 1s) เพื่อมี baseline ของเดือนม.ค. ถ้ามีใน DB
+    final int queryStartUtc = (displayStart.toUtc().millisecondsSinceEpoch ~/ 1000) - 1;
+    final int queryEndUtc   =  (queryEnd.toUtc().millisecondsSinceEpoch   ~/ 1000) - 1; // end-exclusive
 
     return Scaffold(
-      appBar: AppBar(title: Text(title)),
+      appBar: AppBar(title: Text('Yearly Report • $year')),
       body: SafeArea(
         child: LayoutBuilder(
           builder: (context, viewport) {
-            final double cardHeight = viewport.maxHeight * 0.60;
+            final double cardHeight = viewport.maxHeight * 0.64;
 
-            // ให้ผืนกราฟกว้างเกินจอเพื่อแพนได้แม้ยังไม่ซูม
-            const double tickWidth = 64.0; // กว้างต่อ 1 วัน
+            // ให้ผืนกราฟกว้างเกินจอเล็กน้อยเพื่อแพนได้แม้ยังไม่ซูม
+            const double tickWidth = 92.0;
             final double screenW = viewport.maxWidth;
-            final double chartCanvasWidth =
-                math.max(screenW * 1.2, (daysInMonth + 1) * tickWidth);
+            final double canvasW = math.max(screenW * 1.2, (12 + 1) * tickWidth);
 
             return SingleChildScrollView(
               padding: const EdgeInsets.all(16),
@@ -53,8 +58,8 @@ class _ChartMonthState extends State<ChartMonth> {
                   child: StreamBuilder<DatabaseEvent>(
                     stream: ref
                         .orderByKey()
-                        .startAt((startTsUtc - 1).toString()) // baseline: s-1
-                        .endAt((endTsUtc - 1).toString())     // end-exclusive
+                        .startAt(queryStartUtc.toString()) // include baseline (Jan-1 sec)
+                        .endAt(queryEndUtc.toString())     // [start, end)
                         .onValue,
                     builder: (context, snapshot) {
                       if (snapshot.connectionState == ConnectionState.waiting) {
@@ -69,55 +74,51 @@ class _ChartMonthState extends State<ChartMonth> {
                         return SizedBox(
                           height: cardHeight,
                           child: const Center(
-                            child: Text('No data this month', style: TextStyle(color: Colors.black54)),
+                            child: Text('No data this year', style: TextStyle(color: Colors.black54)),
                           ),
                         );
                       }
-
                       final mapRaw = Map<dynamic, dynamic>.from(raw);
 
-                      // -------- พลังงานรวมต่อวัน (kWh/วัน) — ให้ตรงกับหน้า Day --------
-                      final _DailySeriesMonth series = _dailyEnergyKWh_MatchDay_ForMonth(
+                      // ---------- คำนวณพลังงานรวมต่อเดือน (kWh/เดือน) 12 จุด ----------
+                      final List<double> monthlyKWh = _monthlyEnergyKWhMatchDay(
                         mapRaw,
-                        startLocal: startOfMonthLocal,
-                        daysInMonth: daysInMonth,
+                        year: year,
                       );
-                      final List<double> dailyKWh = series.energyKWh; // length = daysInMonth
 
-                      // จุดกราฟ (แกน Y เป็น kWh)
+                      // จุดกราฟ (แกน Y เป็น kWh/เดือน)
                       final List<FlSpot> spots = List<FlSpot>.generate(
-                        daysInMonth,
-                        (i) => FlSpot(i.toDouble(), dailyKWh[i]),
+                        12,
+                        (i) => FlSpot(i.toDouble(), monthlyKWh[i]),
                       );
 
                       // สเกลแกน Y
-                      final double maxVal = dailyKWh.fold<double>(0, (p, v) => math.max(p, v));
+                      final double maxVal = monthlyKWh.fold<double>(0, (p, v) => math.max(p, v));
                       final double maxY = (maxVal <= 0) ? 1.0 : (maxVal * 1.2);
 
-                      // รวมพลังงานทั้งเดือน / ค่าเฉลี่ยต่อวัน
-                      final double totalEnergyKWh = dailyKWh.fold<double>(0, (s, v) => s + v);
+                      // รวมทั้งปี และค่าเฉลี่ยรายเดือน
+                      final double totalEnergyKWh = monthlyKWh.fold<double>(0, (s, v) => s + v);
                       final double totalWh        = totalEnergyKWh * 1000.0;
-                      final double avgPerDayKWh   = daysInMonth > 0 ? totalEnergyKWh / daysInMonth : 0.0;
+                      final double avgPerMonthKWh = totalEnergyKWh / 12.0;
 
-                      // วันพีค/ต่ำสุดจาก kWh/วัน
+                      // หาเดือนพีค/ต่ำสุด
                       int peakIdx = 0, minIdx = 0;
-                      double peakKWh = dailyKWh[0], minKWh = dailyKWh[0];
-                      for (int i = 1; i < daysInMonth; i++) {
-                        if (dailyKWh[i] > peakKWh) { peakKWh = dailyKWh[i]; peakIdx = i; }
-                        if (dailyKWh[i] < minKWh)  { minKWh  = dailyKWh[i];  minIdx  = i; }
+                      double peakVal = monthlyKWh[0], minVal = monthlyKWh[0];
+                      for (int i = 1; i < 12; i++) {
+                        if (monthlyKWh[i] > peakVal) { peakVal = monthlyKWh[i]; peakIdx = i; }
+                        if (monthlyKWh[i] < minVal)  { minVal  = monthlyKWh[i];  minIdx  = i; }
                       }
-                      final DateTime peakDate = startOfMonthLocal.add(Duration(days: peakIdx));
-                      // final DateTime minDate  = startOfMonthLocal.add(Duration(days: minIdx)); // เผื่อใช้ในอนาคต
+                      final DateTime peakMonth = DateTime(year, peakIdx + 1, 1);
 
-                      // วาดกราฟ (label ล่างสองบรรทัดเหมือน week)
-                      final Widget chart = _buildLineChartMonthKWh(
+                      // วาดกราฟ
+                      final Widget chart = _buildLineChartYearKWh(
                         spots: spots,
                         maxY: maxY,
-                        startOfMonthLocal: startOfMonthLocal,
-                        daysInMonth: daysInMonth,
+                        yearStart: displayStart,
                         tickLabelWidth: tickWidth - 14,
                       );
 
+                      // ซูม/แพนด้วยนิ้วเดียว
                       final Widget zoomPanChart = InteractiveViewer(
                         minScale: 1.0,
                         maxScale: 3.5,
@@ -126,28 +127,26 @@ class _ChartMonthState extends State<ChartMonth> {
                         constrained: false,
                         boundaryMargin: const EdgeInsets.all(48),
                         clipBehavior: Clip.none,
-                        child: SizedBox(width: chartCanvasWidth, height: cardHeight, child: chart),
+                        child: SizedBox(width: canvasW, height: cardHeight, child: chart),
                       );
 
-                      final dateShort = DateFormat('dd/MM');
+                      final dateFmt = DateFormat('MMM');
 
                       return Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
-                            'Total Energy: ${totalEnergyKWh.toStringAsFixed(2)} kWh',
+                            'Total Energy: ${_fmtEnergy(totalEnergyKWh)}',
                             style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
                           ),
                           const SizedBox(height: 12),
                           SizedBox(height: cardHeight, child: zoomPanChart),
                           const SizedBox(height: 12),
-
-                          // -------- SUMMARY (สไตล์เดียวกับ week/day) --------
                           _buildSummaryGrid(
                             totalEnergyKWh: totalEnergyKWh,
                             totalWh: totalWh,
-                            avgPerDayKWh: avgPerDayKWh,
-                            peakDayLabel: '${peakKWh.toStringAsFixed(2)} kWh @ ${dateShort.format(peakDate)}',
+                            avgPerMonthKWh: avgPerMonthKWh,
+                            peakLabel: '${peakVal.toStringAsFixed(2)} kWh @ ${dateFmt.format(peakMonth)}',
                           ),
                         ],
                       );
@@ -162,13 +161,14 @@ class _ChartMonthState extends State<ChartMonth> {
     );
   }
 
-  // ---------------- Aggregations (ให้ตรงกับหน้า Day) ----------------
-  _DailySeriesMonth _dailyEnergyKWh_MatchDay_ForMonth(
+  // ---------------- Aggregations (ให้ตรงกติกาหน้า Day) ----------------
+
+  /// รวมพลังงานต่อเดือนแบบเดียวกับ Day: boundary(s-1) → positive increments → power trapezoid
+  List<double> _monthlyEnergyKWhMatchDay(
     Map<dynamic, dynamic> raw, {
-    required DateTime startLocal, // 00:00 ของวันที่ 1 ของเดือน
-    required int daysInMonth,
+    required int year,
   }) {
-    // แปลง raw → entries เรียงตามเวลา
+    // entries ทั้งช่วง (เรียงเวลา)
     final List<MapEntry<int, Map<dynamic, dynamic>>> entries = [];
     raw.forEach((k, v) {
       final int? ts = int.tryParse(k.toString());
@@ -178,23 +178,24 @@ class _ChartMonthState extends State<ChartMonth> {
     });
     entries.sort((a, b) => a.key.compareTo(b.key));
 
-    final List<double> dailyKWh = List<double>.filled(daysInMonth, 0.0);
+    final List<double> monthlyKWh = List<double>.filled(12, 0.0);
 
-    for (int i = 0; i < daysInMonth; i++) {
-      final DateTime sLocal = startLocal.add(Duration(days: i));
+    for (int m = 1; m <= 12; m++) {
+      final DateTime sLocal = DateTime(year, m, 1);
+      final DateTime eLocal = DateTime(year, m + 1, 1);
       final int s = sLocal.toUtc().millisecondsSinceEpoch ~/ 1000;
-      final int e = sLocal.add(const Duration(days: 1)).toUtc().millisecondsSinceEpoch ~/ 1000;
+      final int e = eLocal.toUtc().millisecondsSinceEpoch ~/ 1000;
       final int sMinus1 = s - 1;
 
-      double? eBeforeStart;       // energy เฉพาะ ts == s-1
-      double? eLastBeforeEnd;     // energy ล่าสุดใน [s-1, e)
-      double? prevInDay;          // สำหรับ increments ใน [s, e)
+      double? eBeforeStart;   // energy @ s-1 (baseline)
+      double? eLastBeforeEnd; // energy ล่าสุดในช่วง [s-1, e)
+      double? prevInRange;    // สำหรับ increments ภายใน [s, e)
       double sumIncrements = 0.0;
       final List<MapEntry<int, double>> powerPts = [];
 
       for (final it in entries) {
         final int ts = it.key;
-        if (ts < sMinus1 || ts >= e) continue; // สนใจเฉพาะช่วง [s-1, e)
+        if (ts < sMinus1 || ts >= e) continue; // พิจารณาเฉพาะ [s-1, e)
 
         final double? energy = _tryParseToDouble(it.value['energy']);
         final double powerW  = _numToDouble(it.value['power']);
@@ -204,11 +205,11 @@ class _ChartMonthState extends State<ChartMonth> {
           eLastBeforeEnd = energy;                  // อัปเดตล่าสุดจนก่อน e
 
           if (ts >= s) {
-            if (prevInDay != null) {
-              final diff = energy - prevInDay!;
-              if (diff.isFinite && diff > 0) sumIncrements += diff;
+            if (prevInRange != null) {
+              final diff = energy - prevInRange!;
+              if (diff.isFinite && diff > 0) sumIncrements += diff * kEnergyUnitFactor;
             }
-            prevInDay = energy;
+            prevInRange = energy;
           }
         }
 
@@ -217,7 +218,7 @@ class _ChartMonthState extends State<ChartMonth> {
 
       double? boundary;
       if (eBeforeStart != null && eLastBeforeEnd != null) {
-        final diff = eLastBeforeEnd! - eBeforeStart!;
+        final diff = (eLastBeforeEnd! - eBeforeStart!) * kEnergyUnitFactor;
         if (diff.isFinite && diff > 0) boundary = diff;
       }
 
@@ -230,28 +231,40 @@ class _ChartMonthState extends State<ChartMonth> {
         kwh = _energyKWhFromPowerSeries(powerPts);
       }
 
-      dailyKWh[i] = kwh;
+      monthlyKWh[m - 1] = kwh;
     }
 
-    return _DailySeriesMonth(dailyKWh);
+    return monthlyKWh;
   }
 
-  // ---------------- Chart (แกน Y = kWh) ----------------
-  LineChart _buildLineChartMonthKWh({
+  // อินทิเกรตพลังงานจาก power series (ผลลัพธ์เป็น kWh)
+  double _energyKWhFromPowerSeries(List<MapEntry<int, double>> pts) {
+    if (pts.length < 2) return 0.0;
+    pts.sort((a, b) => a.key.compareTo(b.key));
+    double wh = 0.0;
+    for (var i = 1; i < pts.length; i++) {
+      final double dtHour = (pts[i].key - pts[i - 1].key) / 3600.0;
+      if (dtHour <= 0) continue;
+      final double pAvg = 0.5 * (pts[i].value + pts[i - 1].value);
+      wh += pAvg * dtHour;
+    }
+    return wh / 1000.0;
+  }
+
+  // ---------------- Chart (แกน Y = kWh/เดือน) ----------------
+  LineChart _buildLineChartYearKWh({
     required List<FlSpot> spots,
     required double maxY,
-    required DateTime startOfMonthLocal,
-    required int daysInMonth,
+    required DateTime yearStart,
     required double tickLabelWidth,
   }) {
     final double yStep = (maxY <= 1.0) ? math.max(0.1, maxY / 5) : (maxY / 5);
-    final dateTopFmt = DateFormat('MMM yyyy'); // โชว์เฉพาะบางวัน
-    final dateBotFmt = DateFormat('dd/MM');    // โชว์ทุกวัน
-
+    final dateTopFmt = DateFormat('yyyy'); // โชว์บน Jan/Dec
+    final dateBotFmt = DateFormat('MMM');  // ชื่อเดือน
     return LineChart(
       LineChartData(
         minX: 0.0,
-        maxX: daysInMonth.toDouble(),
+        maxX: 12.0,
         minY: 0,
         maxY: maxY,
         lineTouchData: LineTouchData(
@@ -299,11 +312,9 @@ class _ChartMonthState extends State<ChartMonth> {
               interval: 1,
               getTitlesWidget: (value, _) {
                 final int v = value.toInt();
-                if (v < 0 || v >= daysInMonth) return const SizedBox.shrink();
-                final dt = startOfMonthLocal.add(Duration(days: v));
-                final int day = v + 1;
-                final bool major = (day == 1 || day == 15 || day == daysInMonth);
-
+                if (v < 0 || v > 11) return const SizedBox.shrink();
+                final dt = DateTime(yearStart.year, v + 1, 1);
+                final bool major = (v == 0 || v == 11);
                 return SizedBox(
                   width: tickLabelWidth,
                   child: Column(
@@ -364,33 +375,33 @@ class _ChartMonthState extends State<ChartMonth> {
     );
   }
 
-  // ---------------- Summary (สไตล์เดียวกับ week/day) ----------------
+  // ---------------- Summary (เหมือนกราฟก่อนหน้า) ----------------
   Widget _buildSummaryGrid({
     required double totalEnergyKWh,
     required double totalWh,
-    required double avgPerDayKWh,
-    required String peakDayLabel, // เช่น "0.93 kWh @ 08/09"
+    required double avgPerMonthKWh,
+    required String peakLabel, // "X.XX kWh @ MMM"
   }) {
     final items = <_SummaryItem>[
       _SummaryItem(
         title: 'Total Energy',
-        value: '${totalEnergyKWh.toStringAsFixed(2)} kWh',
+        value: _fmtEnergy(totalEnergyKWh),
         icon: Icons.battery_full_outlined,
         color: const Color(0xFF2E7D32),
       ),
       _SummaryItem(
         title: 'Total (Wh)',
-        value: '${NumberFormat('#,##0').format(totalWh)} Wh',
+        value: _fmtWh(totalWh),
         icon: Icons.flash_on_outlined,
         color: const Color(0xFFFB8C00),
       ),
-      
+     
     ];
 
     return LayoutBuilder(
       builder: (context, constraints) {
         final isPortrait = MediaQuery.of(context).orientation == Orientation.portrait;
-        final int cols = isPortrait ? 2 : 4; // แนวนอนวาง 4 ใบ
+        final int cols = isPortrait ? 2 : 4;
         const double spacing = 12.0;
         final double tileWidth = (constraints.maxWidth - (cols - 1) * spacing) / cols;
 
@@ -413,7 +424,19 @@ class _ChartMonthState extends State<ChartMonth> {
     );
   }
 
-  // ---------- Helpers ----------
+  // ---------------- Formatting helpers ----------------
+  static String _fmtEnergy(double kWh) {
+    if (kWh.abs() >= 100000) return '${NumberFormat.compact().format(kWh)} kWh';
+    return '${kWh.toStringAsFixed(2)} kWh';
+  }
+
+  static String _fmtWh(double wh) {
+    if (wh.abs() >= 1e6) return '${(wh / 1e6).toStringAsFixed(2)} MWh';
+    if (wh.abs() >= 1e3) return '${(wh / 1e3).toStringAsFixed(2)} kWh';
+    return '${wh.toStringAsFixed(0)} Wh';
+  }
+
+  // ---------- Small helpers ----------
   double _numToDouble(dynamic x) {
     if (x is num) return x.toDouble();
     if (x is String) return double.tryParse(x) ?? 0.0;
@@ -425,46 +448,29 @@ class _ChartMonthState extends State<ChartMonth> {
     if (x is String) return double.tryParse(x);
     return null;
   }
-
-  /// อินทิเกรตพลังงานจาก power series แบบทราเพโซอิด (ผลลัพธ์เป็น kWh)
-  double _energyKWhFromPowerSeries(List<MapEntry<int, double>> pts) {
-    if (pts.length < 2) return 0.0;
-    pts.sort((a, b) => a.key.compareTo(b.key));
-    double wh = 0.0;
-    for (var i = 1; i < pts.length; i++) {
-      final dtHour = (pts[i].key - pts[i - 1].key) / 3600.0; // ชั่วโมง
-      if (dtHour <= 0) continue;
-      final pAvg = 0.5 * (pts[i].value + pts[i - 1].value);  // W เฉลี่ยช่วง
-      wh += pAvg * dtHour;                                   // Wh
-    }
-    return wh / 1000.0; // -> kWh
-  }
 }
 
-// ---------------- Models ----------------
-class _DailySeriesMonth {
-  final List<double> energyKWh; // kWh/วัน ความยาว = daysInMonth
-  _DailySeriesMonth(this.energyKWh);
-}
-
-// ---------------- Summary UI (เหมือน week/day) ----------------
+// ---------------- Models & UI ----------------
 class _SummaryItem {
   final String title;
   final String value;
   final IconData icon;
   final Color color;
+  final String? subtitle;
 
   _SummaryItem({
     required this.title,
     required this.value,
     required this.icon,
     required this.color,
+    this.subtitle,
   });
 }
 
 class _SummaryCard extends StatelessWidget {
   final String title;
   final String value;
+  final String? subtitle;
   final IconData icon;
   final Color color;
 
@@ -473,6 +479,7 @@ class _SummaryCard extends StatelessWidget {
     required this.value,
     required this.icon,
     required this.color,
+    this.subtitle,
   });
 
   @override
@@ -483,7 +490,7 @@ class _SummaryCard extends StatelessWidget {
       decoration: BoxDecoration(
         color: color.withOpacity(0.08),
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: color.withOpacity(0.25), width: 1),
+        border: Border.all(color: color.withOpacity(0.25)),
       ),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.center,
@@ -504,10 +511,7 @@ class _SummaryCard extends StatelessWidget {
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(
-                  title,
-                  style: TextStyle(fontSize: 12, color: Colors.black.withOpacity(0.65)),
-                ),
+                Text(title, style: TextStyle(fontSize: 12, color: Colors.black.withOpacity(0.65))),
                 const SizedBox(height: 6),
                 FittedBox(
                   fit: BoxFit.scaleDown,
@@ -516,14 +520,19 @@ class _SummaryCard extends StatelessWidget {
                     value,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
-                    style: TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.w800,
-                      color: color,
-                      height: 1.1,
-                    ),
+                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800, color: color, height: 1.1),
                   ),
                 ),
+                if (subtitle != null) ...[
+                  const SizedBox(height: 4),
+                  Text(
+                    subtitle!,
+                    maxLines: 2,
+                    softWrap: true,
+                    overflow: TextOverflow.visible,
+                    style: TextStyle(fontSize: 12, color: Colors.black.withOpacity(0.65)),
+                  ),
+                ],
               ],
             ),
           ),

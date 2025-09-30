@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:firebase_database/firebase_database.dart';
 
@@ -8,48 +9,75 @@ class Switchbutton extends StatefulWidget {
   State<Switchbutton> createState() => _SwitchbuttonState();
 }
 
-class _SwitchbuttonState extends State<Switchbutton>
-    with SingleTickerProviderStateMixin {
+class _SwitchbuttonState extends State<Switchbutton> {
   bool isOn = false;
-  final dbRef = FirebaseDatabase.instance.ref('device1/status');
+  bool _busy = false; // กันการกดรัวระหว่างเขียนค่า
+  final DatabaseReference dbRef =
+      FirebaseDatabase.instance.ref('device1/status');
 
   double _scale = 1.0;
+
+  StreamSubscription<DatabaseEvent>? _sub; // << สำคัญ: เก็บ subscription
 
   @override
   void initState() {
     super.initState();
 
-    dbRef.onValue.listen((event) {
+    _sub = dbRef.onValue.listen((event) {
       final data = event.snapshot.value;
       if (data is String) {
-        setState(() {
-          isOn = (data == 'on');
-        });
+        final next = (data.toLowerCase() == 'on');
+        // อัปเดตเฉพาะเมื่อค่าต่างจากเดิม และต้องยัง mounted
+        if (mounted && next != isOn) {
+          setState(() {
+            isOn = next;
+          });
+        }
       }
     });
   }
 
-  void _updateStatus(bool value) {
-    final newStatus = value ? 'on' : 'off';
-    dbRef.set(newStatus);
+  Future<void> _updateStatus(bool value) async {
+    // กันการกดซ้ำเร็ว ๆ ระหว่างกำลังเขียน
+    if (mounted) {
+      setState(() => _busy = true);
+    }
+    try {
+      await dbRef.set(value ? 'on' : 'off');
+    } finally {
+      if (mounted) {
+        setState(() => _busy = false);
+      }
+    }
   }
 
   void _onTapDown(TapDownDetails details) {
+    if (!mounted) return;
     setState(() {
       _scale = 0.9;
     });
   }
 
   void _onTapUp(TapUpDetails details) {
+    if (!mounted) return;
     setState(() {
       _scale = 1.0;
     });
   }
 
   void _onTapCancel() {
+    if (!mounted) return;
     setState(() {
       _scale = 1.0;
     });
+  }
+
+  @override
+  void dispose() {
+    // << สำคัญมาก: ยกเลิกการฟังจาก Firebase
+    _sub?.cancel();
+    _sub = null;
+    super.dispose();
   }
 
   @override
@@ -64,12 +92,19 @@ class _SwitchbuttonState extends State<Switchbutton>
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
             GestureDetector(
-              onTap: () {
-                setState(() {
-                  isOn = !isOn;
-                });
-                _updateStatus(isOn);
-              },
+              onTap: _busy
+                  ? null
+                  : () {
+                      // สลับสถานะใน UI ทันที แล้วค่อยเขียนค่าไปที่ DB
+                      final next = !isOn;
+                      if (mounted) {
+                        setState(() {
+                          isOn = next;
+                        });
+                      }
+                      // ไม่ต้องรอ await ที่ onTap เพื่อให้ UI ลื่น
+                      _updateStatus(next);
+                    },
               onTapDown: _onTapDown,
               onTapUp: _onTapUp,
               onTapCancel: _onTapCancel,
@@ -80,25 +115,30 @@ class _SwitchbuttonState extends State<Switchbutton>
                   width: 180,
                   height: 180,
                   decoration: BoxDecoration(
-                    color:
-                        isOn
-                            ? Colors.greenAccent.shade700
-                            : const Color.fromRGBO(116, 114, 114, 1),
+                    color: isOn
+                        ? Colors.greenAccent.shade700
+                        : const Color.fromRGBO(116, 114, 114, 1),
                     borderRadius: BorderRadius.circular(32),
-                    boxShadow: [
+                    boxShadow: const [
                       BoxShadow(
                         color: Colors.black38,
                         blurRadius: 15,
-                        offset: const Offset(0, 8),
+                        offset: Offset(0, 8),
                       ),
                     ],
                   ),
-                  child: const Center(
-                    child: Icon(
-                      Icons.power_settings_new,
-                      color: Colors.white,
-                      size: 100,
-                    ),
+                  child: Center(
+                    child: _busy
+                        ? const SizedBox(
+                            width: 40,
+                            height: 40,
+                            child: CircularProgressIndicator(strokeWidth: 4),
+                          )
+                        : const Icon(
+                            Icons.power_settings_new,
+                            color: Colors.white,
+                            size: 100,
+                          ),
                   ),
                 ),
               ),
@@ -109,10 +149,9 @@ class _SwitchbuttonState extends State<Switchbutton>
               style: TextStyle(
                 fontSize: 28,
                 fontWeight: FontWeight.bold,
-                color:
-                    isOn
-                        ? Colors.green
-                        : const Color.fromRGBO(116, 114, 114, 1),
+                color: isOn
+                    ? Colors.green
+                    : const Color.fromRGBO(116, 114, 114, 1),
               ),
             ),
           ],

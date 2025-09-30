@@ -3,40 +3,42 @@ plugins {
     // START: FlutterFire Configuration
     id("com.google.gms.google-services")
     // END: FlutterFire Configuration
-    id("kotlin-android")
+    id("org.jetbrains.kotlin.android")          // ⬅ ใช้ id นี้ให้ตรงกับ settings.gradle
     // The Flutter Gradle Plugin must be applied after the Android and Kotlin Gradle plugins.
     id("dev.flutter.flutter-gradle-plugin")
 }
 
 android {
     namespace = "com.example.flutter_app_test"
+
+    // จะใช้แบบนี้ก็ได้ ถ้า flutter.compileSdkVersion เป็น 34 อยู่แล้ว
     compileSdk = flutter.compileSdkVersion
+    // หรือกำหนดตรงไปเลย:
+    // compileSdk = 34
+
     ndkVersion = "27.0.12077973"
 
     compileOptions {
-        sourceCompatibility = JavaVersion.VERSION_11
-        targetCompatibility = JavaVersion.VERSION_11
+        // ใช้ Java 17 ให้สอดคล้องกับ AGP/Kotlin รุ่นใหม่
+        sourceCompatibility = JavaVersion.VERSION_17
+        targetCompatibility = JavaVersion.VERSION_17
     }
 
     kotlinOptions {
-        jvmTarget = JavaVersion.VERSION_11.toString()
+        jvmTarget = "17"
     }
 
     defaultConfig {
-        // TODO: Specify your own unique Application ID (https://developer.android.com/studio/build/application-id.html).
         applicationId = "com.example.flutter_app_test"
-        // You can update the following values to match your application needs.
-        // For more information, see: https://flutter.dev/to/review-gradle-config.
-        minSdk = 23
-        targetSdk = 33
+        minSdk = flutter.minSdkVersion                // แนะนำ 23+
+        targetSdk = 34             // ⬅ อัปเป็น 34
         versionCode = 1
         versionName = "1.0"
     }
 
     buildTypes {
         release {
-            // TODO: Add your own signing config for the release build.
-            // Signing with the debug keys for now, so `flutter run --release` works.
+            // ใส่ signingConfig ของ release เองภายหลังได้
             signingConfig = signingConfigs.getByName("debug")
         }
     }
